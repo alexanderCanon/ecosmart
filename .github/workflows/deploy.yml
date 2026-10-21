@@ -1,0 +1,40 @@
+name: Deploy EcoSmart service
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: "Service to deploy (runs on Raspberry Pi)"
+        required: true
+        type: choice
+        options:
+          - homepage
+          - docker
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ecosmart-pi-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # Don't run unreviewed pull requests on the device.
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, ARM64, ecosmart-pi]
+    timeout-minutes: 20
+    steps:
+      - name: Check deploy gateway is installed
+        shell: bash
+        run: |
+          test -x /usr/local/sbin/ecosmart-deploy || {
+            echo "Bootstrap required: see docs/deploy.md"
+            exit 1
+          }
+          sudo -n -l /usr/local/sbin/ecosmart-deploy "${{ inputs.component }}" "$GITHUB_SHA" >/dev/null
+
+      - name: Deploy reviewed main commit via Ansible
+        shell: bash
+        run: |
+          sudo -n /usr/local/sbin/ecosmart-deploy "${{ inputs.component }}" "$GITHUB_SHA"

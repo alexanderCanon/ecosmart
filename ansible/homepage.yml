@@ -1,0 +1,24 @@
+---
+- name: Deploy Homepage dashboard
+  hosts: raspberry
+  become: true
+
+  tasks:
+    - name: Create Homepage directory
+      ansible.builtin.file:
+        path: /opt/ecosmart/homepage/config
+        state: directory
+        mode: "0755"
+
+    - name: Copy Docker Compose configuration
+      ansible.builtin.copy:
+        src: templates/homepage/compose.yml
+        dest: /opt/ecosmart/homepage/compose.yml
+        mode: "0644"
+
+    - name: Start Homepage container
+      ansible.builtin.command:
+        cmd: docker compose up -d
+        chdir: /opt/ecosmart/homepage
+      register: homepage_start
+      changed_when: "'Started' in homepage_start.stderr or 'Created' in homepage_start.stderr"

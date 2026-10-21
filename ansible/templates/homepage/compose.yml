@@ -1,0 +1,11 @@
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    ports:
+      - "100.115.100.90:3000:3000"
+    environment:
+      HOMEPAGE_ALLOWED_HOSTS: "100.115.100.90:3000"
+    volumes:
+      - ./config:/app/config

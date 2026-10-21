@@ -1,0 +1,18 @@
+[Unit]
+Description=EcoSmart local-only Wi-Fi setup portal
+After=NetworkManager.service
+Requires=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/sbin/ecosmart-wifi-portal
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+ReadWritePaths=/run /etc/NetworkManager/system-connections
+
+[Install]
+WantedBy=multi-user.target

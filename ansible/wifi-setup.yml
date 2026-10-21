@@ -129,9 +129,11 @@
         name: ecosmart-wifi-fallback.timer
         enabled: true
         state: started
+      when: not ansible_check_mode
 
     - name: Enable and start local Wi-Fi portal service
       ansible.builtin.systemd_service:
         name: ecosmart-wifi-portal.service
         enabled: true
         state: started
+      when: not ansible_check_mode

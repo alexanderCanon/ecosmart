@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export ANSIBLE_NOCOLOR=1
+
+# Run from sudo only. Repository content is fetched by root into a root-owned directory.
+if [[ "$(id -u)" != "0" ]]; then
+  echo "Must run as root" >&2; exit 1
+fi
+if [[ "$#" != 2 ]]; then
+  echo "Usage: ecosmart-deploy homepage|docker <40-character git SHA>" >&2; exit 2
+fi
+component="$1"
+sha="$2"
+case "$component" in homepage|docker) ;; *) echo "Invalid component" >&2; exit 2;; esac
+if [[ ! "$sha" =~ ^[0-9a-fA-F]{40}$ ]]; then
+  echo "Invalid SHA" >&2; exit 2
+fi
+
+# Prevent simultaneous jobs modifying a live system.
+exec 9>/run/ecosmart-deploy.lock
+flock -n 9 || { echo "Another deployment is running" >&2; exit 1; }
+
+repo=/opt/ecosmart-deployer/source
+if [[ ! -d "$repo/.git" ]]; then
+  mkdir -p /opt/ecosmart-deployer
+  git clone --no-checkout https://github.com/alexanderCanon/ecosmart.git "$repo"
+fi
+git -C "$repo" fetch --prune origin main
+if ! git -C "$repo" merge-base --is-ancestor "$sha" refs/remotes/origin/main; then
+  echo "Commit is not on origin/main; refusing to deploy" >&2; exit 1
+fi
+git -C "$repo" checkout --force --detach "$sha"
+git -C "$repo" clean -ffd
+
+case "$component" in
+  homepage) playbook=homepage.yml ;;
+  docker) playbook=docker.yml ;;
+esac
+cd "$repo"
+/usr/bin/ansible-playbook -i 'localhost,' -c local "ansible/$playbook"

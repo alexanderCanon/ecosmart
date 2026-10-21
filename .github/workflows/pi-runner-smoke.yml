@@ -1,0 +1,32 @@
+name: EcoSmart Raspberry runner connectivity
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ecosmart-pi-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    # Explicit labels prevent accidentally dispatching to other runners.
+    runs-on: [self-hosted, Linux, ARM64, ecosmart-pi]
+    timeout-minutes: 5
+    steps:
+      - name: Report machine and user (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'User: '; id -un
+          printf 'Architecture: '; uname -m
+          printf 'OS: '; cat /etc/os-release | grep PRETTY_NAME
+          printf 'Ansible installed: '
+          if command -v ansible-playbook >/dev/null 2>&1; then
+            ansible-playbook --version | head -n 1
+          else
+            echo 'no (expected until provisioning)'
+          fi
+          test "$(uname -m)" = "aarch64"

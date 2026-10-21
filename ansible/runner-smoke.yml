@@ -1,0 +1,23 @@
+---
+- name: Verify local Ansible execution on EcoSmart runner
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  become: false
+
+  tasks:
+    - name: Confirm ARM64 Raspberry Pi
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['architecture'] == 'aarch64'
+          - ansible_facts['system'] == 'Linux'
+        fail_msg: "This playbook must run on the Raspberry Pi ARM64 runner."
+
+    - name: Read local identity
+      ansible.builtin.command: id -un
+      register: runner_identity
+      changed_when: false
+
+    - name: Show local Ansible identity
+      ansible.builtin.debug:
+        msg: "Ansible running locally as {{ runner_identity.stdout }} on {{ ansible_facts['architecture'] }}"

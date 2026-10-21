@@ -1,0 +1,36 @@
+name: Verify local Ansible on Raspberry Pi
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ecosmart-pi-ansible-smoke
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: [self-hosted, Linux, ARM64, ecosmart-pi]
+    timeout-minutes: 10
+    steps:
+      - name: Checkout configuration
+        uses: actions/checkout@v4
+
+      - name: Install Ansible in runner work directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/ecosmart-ansible-venv"
+          "$RUNNER_TEMP/ecosmart-ansible-venv/bin/python" -m pip install --disable-pip-version-check "ansible-core>=2.17,<2.21"
+
+      - name: Validate playbook syntax
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/ecosmart-ansible-venv/bin/ansible-playbook" ansible/runner-smoke.yml --syntax-check
+
+      - name: Execute Ansible locally without sudo
+        shell: bash
+        run: |
+          "$RUNNER_TEMP/ecosmart-ansible-venv/bin/ansible-playbook" -i 'localhost,' ansible/runner-smoke.yml

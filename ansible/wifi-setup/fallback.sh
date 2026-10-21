@@ -2,7 +2,7 @@
 set -eu
 
 # Never interfere with Ethernet. Only examine wlan0.
-if ! nmcli -t -f DEVICE,TYPE device status | grep -q '^wlan0:wifi$'; then
+if ! nmcli -t -f DEVICE,TYPE device status | grep -q '^wlan0:wifi:'; then
   exit 0
 fi
 

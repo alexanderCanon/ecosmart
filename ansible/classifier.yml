@@ -1,0 +1,76 @@
+---
+- name: Deploy EcoSmart Intelligent Waste Classifier
+  hosts: raspberry
+  become: true
+
+  tasks:
+    - name: Enable I2C interface in firmware
+      ansible.builtin.command:
+        cmd: raspi-config nonint do_i2c 0
+      changed_when: false
+
+    - name: Install hardware, audio and camera packages
+      ansible.builtin.apt:
+        name:
+          - i2c-tools
+          - python3-smbus
+          - python3-gpiozero
+          - python3-picamera2
+          - espeak-ng
+          - alsa-utils
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create classifier application directory
+      ansible.builtin.file:
+        path: /opt/ecosmart/classifier
+        state: directory
+        owner: sef
+        group: sef
+        mode: "0755"
+
+    - name: Copy classifier application files
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: /opt/ecosmart/classifier/
+        owner: sef
+        group: sef
+        mode: "0755"
+      loop:
+        - ../src/classifier/config.py
+        - ../src/classifier/lcd_i2c.py
+        - ../src/classifier/main.py
+        - ../src/classifier/test_hardware.py
+
+    - name: Install systemd service unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ecosmart-classifier.service
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          [Unit]
+          Description=EcoSmart Intelligent Waste Classifier
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          User=sef
+          WorkingDirectory=/opt/ecosmart/classifier
+          EnvironmentFile=-/etc/default/ecosmart
+          ExecStart=/usr/bin/python3 /opt/ecosmart/classifier/main.py
+          Restart=on-failure
+          RestartSec=5
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+      register: classifier_service
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: classifier_service.changed

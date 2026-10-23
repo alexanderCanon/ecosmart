@@ -225,7 +225,7 @@ class EcoSmartClassifier:
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=12) as response:
+            with urllib.request.urlopen(req, timeout=30) as response:
                 result = json.loads(response.read().decode("utf-8"))
                 text_response = result["candidates"][0]["content"]["parts"][0]["text"]
                 data = json.loads(text_response)

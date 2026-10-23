@@ -91,11 +91,11 @@ class EcoSmartClassifier:
         try:
             from picamera2 import Picamera2
             self.picam2 = Picamera2()
-            cam_config = self.picam2.create_still_configuration(main={"size": (1024, 768)})
+            cam_config = self.picam2.create_still_configuration(main={"size": (640, 480)})
             self.picam2.configure(cam_config)
             self.picam2.start()
             time.sleep(1)
-            logging.info("Cámara Picamera2 OV5647 lista.")
+            logging.info("Cámara Picamera2 OV5647 lista (640x480 ultra-rápida).")
         except Exception as exc:
             logging.error("No se pudo iniciar cámara OV5647: %s", exc)
             self.picam2 = None
@@ -123,6 +123,7 @@ class EcoSmartClassifier:
         """Reproduce audio con voz neuronal en español de alta fidelidad vía Jack 3.5mm."""
         def _run():
             mp3_path = "/tmp/ecosmart_speech.mp3"
+            wav_path = "/tmp/ecosmart_speech.wav"
             try:
                 # Intento 1: Edge-TTS (Voz neuronal humana de Microsoft)
                 import asyncio
@@ -133,8 +134,14 @@ class EcoSmartClassifier:
                     await communicate.save(mp3_path)
 
                 asyncio.run(_gen())
+
+                # Convertir a WAV y reproducir forzando directamente la tarjeta de audífonos (Jack 3.5mm)
                 subprocess.run(
-                    ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", mp3_path],
+                    ["ffmpeg", "-y", "-v", "quiet", "-i", mp3_path, wav_path],
+                    check=True
+                )
+                subprocess.run(
+                    ["aplay", "-D", "plughw:Headphones", wav_path],
                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
                 )
                 return
@@ -142,7 +149,7 @@ class EcoSmartClassifier:
                 logging.warning("Fallo en TTS neuronal (%s). Usando respaldo offline.", exc)
 
             try:
-                # Intento 2: Respaldo espeak-ng
+                # Intento 2: Respaldo espeak-ng forzado a Headphones
                 subprocess.run(["espeak-ng", "-v", "es", "-s", "150", text],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
             except Exception:

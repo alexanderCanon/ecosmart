@@ -1,0 +1,14 @@
+[Unit]
+Description=EcoSmart Wi-Fi Onboarding Portal
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/ecosmart-wifi-setup
+Restart=no
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

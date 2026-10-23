@@ -1,0 +1,97 @@
+---
+- name: Provision EcoSmart Wi-Fi Onboarding Portal
+  hosts: raspberry
+  become: true
+
+  tasks:
+    - name: Disable conflicting RaspAP and standalone hotspot services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - hostapd.service
+        - lighttpd.service
+        - raspapd.service
+        - raspap-network-activity@wlan0.service
+        - dnsmasq.service
+      failed_when: false
+
+    - name: Disable deprecated prototype units
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - ecosmart-wifi-fallback.timer
+        - ecosmart-wifi-fallback.service
+        - ecosmart-wifi-portal.service
+      failed_when: false
+
+    - name: Remove deprecated prototype files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/ecosmart-wifi-fallback.timer
+        - /etc/systemd/system/ecosmart-wifi-fallback.service
+        - /etc/systemd/system/ecosmart-wifi-portal.service
+        - /usr/local/sbin/ecosmart-wifi-fallback
+        - /usr/local/sbin/ecosmart-wifi-portal
+        - /usr/local/sbin/ecosmart-wifi-connect
+
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - network-manager
+          - dnsmasq-base
+          - python3
+          - curl
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Ensure NetworkManager dnsmasq-shared directory exists
+      ansible.builtin.file:
+        path: /etc/NetworkManager/dnsmasq-shared.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install captive DNS redirection configuration
+      ansible.builtin.copy:
+        src: wifi-setup/ecosmart-captive.conf
+        dest: /etc/NetworkManager/dnsmasq-shared.d/ecosmart-captive.conf
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install EcoSmart Wi-Fi onboarding script
+      ansible.builtin.copy:
+        src: wifi-setup/ecosmart-wifi-setup.py
+        dest: /usr/local/sbin/ecosmart-wifi-setup
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install systemd service unit
+      ansible.builtin.copy:
+        src: wifi-setup/ecosmart-wifi-setup.service
+        dest: /etc/systemd/system/ecosmart-wifi-setup.service
+        owner: root
+        group: root
+        mode: "0644"
+      register: wifi_service_unit
+
+    - name: Reload systemd daemon
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: wifi_service_unit.changed
+
+    - name: Enable and restart EcoSmart Wi-Fi setup service
+      ansible.builtin.systemd_service:
+        name: ecosmart-wifi-setup.service
+        enabled: true
+        state: restarted
+      when: not ansible_check_mode

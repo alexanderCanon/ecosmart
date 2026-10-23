@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>EcoSmart - Diagrama de Conexiones de Hardware</title>
+  <style>
+    @page {
+      size: A4 portrait;
+      margin: 12mm 15mm;
+      @bottom-right {
+        content: "Página " counter(page) " de " counter(pages);
+        font-size: 9pt;
+        color: #64748b;
+      }
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1e293b;
+      line-height: 1.35;
+      font-size: 10pt;
+    }
+    .header {
+      border-bottom: 3px solid #10b981;
+      padding-bottom: 8px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 {
+      font-size: 18pt;
+      color: #0f172a;
+      margin: 0;
+      font-weight: 800;
+    }
+    .header .subtitle {
+      font-size: 10pt;
+      color: #059669;
+      font-weight: 600;
+    }
+    .badge {
+      background: #10b981;
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 8pt;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .alert-box {
+      border-radius: 6px;
+      padding: 9px 12px;
+      margin-bottom: 12px;
+      font-size: 9pt;
+    }
+    .alert-danger {
+      background: #fef2f2;
+      border-left: 4px solid #ef4444;
+      color: #991b1b;
+    }
+    .alert-warning {
+      background: #fffbeb;
+      border-left: 4px solid #f59e0b;
+      color: #92400e;
+    }
+    .alert-box h4 {
+      margin: 0 0 3px 0;
+      font-size: 9.5pt;
+      font-weight: bold;
+    }
+    h2 {
+      font-size: 12pt;
+      color: #0f172a;
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 4px;
+      margin: 12px 0 8px 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 12px;
+      font-size: 8.5pt;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 5px 7px;
+      text-align: left;
+    }
+    th {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: 700;
+    }
+    tr:nth-child(even) { background: #f8fafc; }
+    .tag-pwr { background: #fee2e2; color: #991b1b; font-weight: bold; padding: 1px 4px; border-radius: 3px; }
+    .tag-gnd { background: #e2e8f0; color: #1e293b; font-weight: bold; padding: 1px 4px; border-radius: 3px; }
+    .tag-gpio { background: #dcfce7; color: #166534; font-weight: bold; padding: 1px 4px; border-radius: 3px; }
+    .tag-i2c { background: #e0e7ff; color: #3730a3; font-weight: bold; padding: 1px 4px; border-radius: 3px; }
+
+    .diagram-card {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 10px;
+      margin-bottom: 12px;
+    }
+    .schematic-box {
+      background: #0f172a;
+      color: #38bdf8;
+      font-family: monospace;
+      padding: 10px;
+      border-radius: 6px;
+      font-size: 8.5pt;
+      line-height: 1.4;
+      white-space: pre;
+      margin: 6px 0;
+    }
+    .page-break { page-break-before: always; }
+    .step-list {
+      margin: 0;
+      padding-left: 18px;
+    }
+    .step-list li {
+      margin-bottom: 5px;
+      font-size: 9pt;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div>
+      <h1>EcoSmart - Clasificador Inteligente de Basura</h1>
+      <div class="subtitle">Guía Maestra de Cableado de Hardware & Diagrama Eléctrico (Raspberry Pi 4B)</div>
+    </div>
+  </div>
+
+  <div class="alert-box alert-danger">
+    <h4>⚠️ REGLA CRÍTICA #1: Alimentación de los 3 Servomotores</h4>
+    <strong>NUNCA alimentes los 3 servos desde el pin de 5V de la Raspberry Pi.</strong> Los servomotores al moverse generan picos de corriente de hasta 2A que reiniciarán la Pi o corromperán la tarjeta MicroSD. Usa una <strong>fuente externa de 5V</strong> para los servos y conecta el polo negativo (GND) de la fuente al GND de la Pi (Tierra compartida).
+  </div>
+
+  <div class="alert-box alert-warning">
+    <h4>⚠️ REGLA CRÍTICA #2: Divisor de Tensión en Sensor HC-SR04</h4>
+    El pin <strong>ECHO</strong> del sensor devuelve <strong>5V</strong>, pero los pines de la Pi solo toleran <strong>3.3V</strong>. Es obligatorio armar el divisor con las <strong>3 resistencias de 10 kΩ</strong> (Marrón-Negro-Naranja-Dorado) antes de llegar al GPIO 24.
+  </div>
+
+  <h2>1. Divisor de Voltaje para el Sensor Ultrasónico (ECHO a 3.3V)</h2>
+  <div class="diagram-card">
+    <div class="schematic-box">
+Sensor HC-SR04 (Pin ECHO: 5V)
+           │
+           ▼
+     [ R1: 10 kΩ ]  (Marrón - Negro - Naranja - Dorado)
+           │
+           ├───────────────────────────────► Hacia Pin Físico 18 (GPIO 24 de la Pi)
+           │                                 (Voltaje resultante: 3.33V seguro)
+     [ R2: 10 kΩ ]
+           │
+     [ R3: 10 kΩ ]  (R2 + R3 en serie suman 20 kΩ)
+           │
+           ▼
+     GND (Tierra de la Raspberry Pi / Protoboard)
+    </div>
+  </div>
+
+  <h2>2. Tabla Maestra de Conexiones (Pinout Raspberry Pi 4B)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 14%;">Componente</th>
+        <th style="width: 16%;">Pin del Módulo</th>
+        <th style="width: 18%;">Pin Físico Pi (1-40)</th>
+        <th style="width: 18%;">Identificador GPIO</th>
+        <th style="width: 34%;">Instrucciones de Conexión</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>LCD 1602 I2C</strong></td>
+        <td>GND / VCC</td>
+        <td><span class="tag-gnd">Pin 6 (GND)</span> / <span class="tag-pwr">Pin 4 (5V)</span></td>
+        <td>GND / 5V Power</td>
+        <td>Alimentación del módulo I2C</td>
+      </tr>
+      <tr>
+        <td><strong>LCD 1602 I2C</strong></td>
+        <td>SDA</td>
+        <td><span class="tag-i2c">Pin 3</span></td>
+        <td>GPIO 2 (I2C SDA)</td>
+        <td>Línea de datos I2C</td>
+      </tr>
+      <tr>
+        <td><strong>LCD 1602 I2C</strong></td>
+        <td>SCL</td>
+        <td><span class="tag-i2c">Pin 5</span></td>
+        <td>GPIO 3 (I2C SCL)</td>
+        <td>Línea de reloj I2C</td>
+      </tr>
+      <tr>
+        <td><strong>HC-SR04</strong></td>
+        <td>VCC / GND</td>
+        <td><span class="tag-pwr">Pin 2 (5V)</span> / <span class="tag-gnd">Pin 9 (GND)</span></td>
+        <td>5V Power / GND</td>
+        <td>Alimentación del sensor ultrasónico</td>
+      </tr>
+      <tr>
+        <td><strong>HC-SR04</strong></td>
+        <td>TRIG</td>
+        <td><span class="tag-gpio">Pin 16</span></td>
+        <td>GPIO 23</td>
+        <td>Disparo ultrasónico (Directo a la Pi)</td>
+      </tr>
+      <tr>
+        <td><strong>HC-SR04</strong></td>
+        <td>ECHO</td>
+        <td><span class="tag-gpio">Pin 18</span></td>
+        <td>GPIO 24</td>
+        <td><strong>PASA POR EL DIVISOR (3x 10kΩ)</strong></td>
+      </tr>
+      <tr>
+        <td><strong>Servo 1 (Orgánico)</strong></td>
+        <td>Señal (Naranja)</td>
+        <td><span class="tag-gpio">Pin 11</span></td>
+        <td>GPIO 17</td>
+        <td>VCC y GND van a la Fuente Externa 5V</td>
+      </tr>
+      <tr>
+        <td><strong>Servo 2 (Recicla)</strong></td>
+        <td>Señal (Naranja)</td>
+        <td><span class="tag-gpio">Pin 13</span></td>
+        <td>GPIO 27</td>
+        <td>VCC y GND van a la Fuente Externa 5V</td>
+      </tr>
+      <tr>
+        <td><strong>Servo 3 (Inorgánico)</strong></td>
+        <td>Señal (Naranja)</td>
+        <td><span class="tag-gpio">Pin 15</span></td>
+        <td>GPIO 22</td>
+        <td>VCC y GND van a la Fuente Externa 5V</td>
+      </tr>
+      <tr>
+        <td><strong>LED RGB (Rojo)</strong></td>
+        <td>Ánodo R</td>
+        <td><span class="tag-gpio">Pin 22</span></td>
+        <td>GPIO 25</td>
+        <td>Conectar en serie con resistencia 220Ω</td>
+      </tr>
+      <tr>
+        <td><strong>LED RGB (Verde)</strong></td>
+        <td>Ánodo G</td>
+        <td><span class="tag-gpio">Pin 24</span></td>
+        <td>GPIO 8</td>
+        <td>Conectar en serie con resistencia 220Ω</td>
+      </tr>
+      <tr>
+        <td><strong>LED RGB (Azul)</strong></td>
+        <td>Ánodo B</td>
+        <td><span class="tag-gpio">Pin 26</span></td>
+        <td>GPIO 7</td>
+        <td>Conectar en serie con resistencia 220Ω</td>
+      </tr>
+      <tr>
+        <td><strong>LED RGB (GND)</strong></td>
+        <td>Cátodo común (-)</td>
+        <td><span class="tag-gnd">Pin 20 o 14 (GND)</span></td>
+        <td>GND</td>
+        <td>Patita más larga del LED RGB al negativo</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <h2>3. Cámara OV5647 y Salida de Audio</h2>
+  <div class="diagram-card">
+    <p><strong>Cámara OV5647 (Conector Ribbon CSI):</strong></p>
+    <ul class="step-list">
+      <li>Ubica el puerto CSI en la Raspberry Pi (está entre el puerto HDMI y el conector Jack 3.5mm de audio).</li>
+      <li>Levanta suavemente la trabilla plástica negra hacia arriba.</li>
+      <li>Inserta el cable plano ribbon con los <strong>contactos metálicos plateados mirando hacia el puerto HDMI</strong> (y la franja azul mirando hacia los puertos USB/Ethernet).</li>
+      <li>Presiona la trabilla negra hacia abajo firmemente para asegurarlo.</li>
+    </ul>
+    <p style="margin-top: 10px;"><strong>Audio (Jack 3.5mm estéreo):</strong></p>
+    <ul class="step-list">
+      <li>Conecta una bocina portátil amplificada o audífonos con conector auxiliar jack 3.5mm en el puerto de audio de la Raspberry Pi.</li>
+      <li>El clasificador generará automáticamente voz en español con <code>espeak-ng</code>.</li>
+    </ul>
+  </div>
+
+  <h2>4. Mapa Gráfico del Conector de 40 Pines GPIO</h2>
+  <div class="schematic-box">
+             PUERTOS USB / RED MIRANDO HACIA LA DERECHA
+       -------------------------------------------------------------
+       FILA INTERNA (Impares)            FILA EXTERNA (Pares)
+       [Pin  1] 3.3V                     [Pin  2] 5V Power (HC-SR04 VCC)
+       [Pin  3] GPIO 2  (LCD SDA)        [Pin  4] 5V Power (LCD 1602 VCC)
+       [Pin  5] GPIO 3  (LCD SCL)        [Pin  6] GND      (LCD 1602 GND)
+       [Pin  7] GPIO 4                   [Pin  8] GPIO 14
+       [Pin  9] GND     (HC-SR04 GND)    [Pin 10] GPIO 15
+       [Pin 11] GPIO 17 (Servo 1 Organ)  [Pin 12] GPIO 18
+       [Pin 13] GPIO 27 (Servo 2 Recic)  [Pin 14] GND      (GND Fuente Servos)
+       [Pin 15] GPIO 22 (Servo 3 Inorg)  [Pin 16] GPIO 23  (HC-SR04 TRIG)
+       [Pin 17] 3.3V                     [Pin 18] GPIO 24  (HC-SR04 ECHO div.)
+       [Pin 19] GPIO 10                  [Pin 20] GND      (LED RGB Cátodo)
+       [Pin 21] GPIO 9                   [Pin 22] GPIO 25  (LED Rojo 220Ω)
+       [Pin 23] GPIO 11                  [Pin 24] GPIO 8   (LED Verde 220Ω)
+       [Pin 25] GND                      [Pin 26] GPIO 7   (LED Azul 220Ω)
+       ...                               ...
+       -------------------------------------------------------------
+  </div>
+
+  <h2>5. Guía de Pruebas y Puesta en Marcha (Paso a Paso)</h2>
+  <ol class="step-list">
+    <li><strong>Despliegue automático con Ansible desde tu máquina:</strong>
+      <pre style="background:#e2e8f0; padding:6px; border-radius:4px; font-size:8.5pt;">ansible-playbook -i ansible/inventory.ini ansible/classifier.yml -K</pre>
+    </li>
+    <li><strong>Diagnóstico individual por componente (en la Raspberry Pi):</strong>
+      <pre style="background:#e2e8f0; padding:6px; border-radius:4px; font-size:8.5pt;">python3 /opt/ecosmart/classifier/test_hardware.py --test-all</pre>
+      O prueba pieza por pieza:
+      <code>--test-led</code>, <code>--test-lcd</code>, <code>--test-distance</code>, <code>--test-servos</code>, <code>--test-camera</code>, <code>--test-audio</code>.
+    </li>
+    <li><strong>Configurar tu API Key de Gemini:</strong>
+      <pre style="background:#e2e8f0; padding:6px; border-radius:4px; font-size:8.5pt;">export GEMINI_API_KEY="TU_API_KEY_DE_GOOGLE_AQUI"</pre>
+      *(Si no colocas la API Key, el sistema corre en modo demostración para pruebas mecánicas).*
+    </li>
+    <li><strong>Iniciar el clasificador inteligente:</strong>
+      <pre style="background:#e2e8f0; padding:6px; border-radius:4px; font-size:8.5pt;">python3 /opt/ecosmart/classifier/main.py</pre>
+    </li>
+  </ol>
+
+</body>
+</html>

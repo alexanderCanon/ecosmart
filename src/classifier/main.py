@@ -120,19 +120,38 @@ class EcoSmartClassifier:
             self.led_blue.on()
 
     def speak(self, text):
-        """Reproduce audio TTS en español a través del Jack 3.5mm de forma no bloqueante."""
+        """Reproduce audio con voz neuronal en español de alta fidelidad vía Jack 3.5mm."""
         def _run():
+            mp3_path = "/tmp/ecosmart_speech.mp3"
             try:
-                # Intento 1: espeak-ng
+                # Intento 1: Edge-TTS (Voz neuronal humana de Microsoft)
+                import asyncio
+                import edge_tts
+
+                async def _gen():
+                    communicate = edge_tts.Communicate(text, config.TTS_VOICE)
+                    await communicate.save(mp3_path)
+
+                asyncio.run(_gen())
+                subprocess.run(
+                    ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", mp3_path],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True
+                )
+                return
+            except Exception as exc:
+                logging.warning("Fallo en TTS neuronal (%s). Usando respaldo offline.", exc)
+
+            try:
+                # Intento 2: Respaldo espeak-ng
                 subprocess.run(["espeak-ng", "-v", "es", "-s", "150", text],
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
             except Exception:
                 try:
-                    # Intento 2: espeak tradicional
+                    # Intento 3: Respaldo espeak tradicional
                     subprocess.run(["espeak", "-v", "es", "-s", "150", text],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-                except Exception as exc:
-                    logging.warning("No se pudo sintetizar voz: %s", exc)
+                except Exception as exc2:
+                    logging.warning("No se pudo sintetizar voz: %s", exc2)
 
         threading.Thread(target=_run, daemon=True).start()
 

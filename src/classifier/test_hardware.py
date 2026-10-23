@@ -130,6 +130,18 @@ def test_audio():
     print("\n--- [6/6] Probando Salida de Audio (Jack 3.5mm) ---")
     frase = "Prueba de audio EcoSmart completada exitosamente."
     try:
+        import asyncio
+        import edge_tts
+        mp3_path = "/tmp/ecosmart_test_neural.mp3"
+        print("-> Generando voz neuronal de alta definición (es-MX-DaliaNeural)...")
+        asyncio.run(edge_tts.Communicate(frase, config.TTS_VOICE).save(mp3_path))
+        subprocess.run(["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", mp3_path], check=True)
+        print("✓ Audio neuronal reproducido con éxito.")
+        return
+    except Exception as exc:
+        print(f"  Aviso: TTS neuronal no disponible ({exc}). Probando respaldo espeak...")
+
+    try:
         subprocess.run(["espeak-ng", "-v", "es", frase], check=True)
         print("✓ Audio reproducido vía espeak-ng.")
     except Exception:
@@ -138,7 +150,6 @@ def test_audio():
             print("✓ Audio reproducido vía espeak.")
         except Exception as exc:
             print(f"✗ No se pudo reproducir audio con sintetizador: {exc}")
-            print("  Instala espeak-ng con: sudo apt install -y espeak-ng")
 
 
 def main():

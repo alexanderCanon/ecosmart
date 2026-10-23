@@ -32,16 +32,16 @@
 
     - name: Copy classifier application files
       ansible.builtin.copy:
-        src: "{{ item }}"
+        src: "{{ playbook_dir }}/../src/classifier/{{ item }}"
         dest: /opt/ecosmart/classifier/
         owner: sef
         group: sef
         mode: "0755"
       loop:
-        - ../src/classifier/config.py
-        - ../src/classifier/lcd_i2c.py
-        - ../src/classifier/main.py
-        - ../src/classifier/test_hardware.py
+        - config.py
+        - lcd_i2c.py
+        - main.py
+        - test_hardware.py
 
     - name: Install systemd service unit
       ansible.builtin.copy:
@@ -74,3 +74,10 @@
       ansible.builtin.systemd_service:
         daemon_reload: true
       when: classifier_service.changed
+
+    - name: Ensure classifier service is stopped for testing
+      ansible.builtin.systemd_service:
+        name: ecosmart-classifier.service
+        state: stopped
+        enabled: false
+      failed_when: false

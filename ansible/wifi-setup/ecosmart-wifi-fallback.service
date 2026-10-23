@@ -1,8 +1,0 @@
-[Unit]
-Description=EcoSmart Wi-Fi fallback access point
-After=NetworkManager.service
-Requires=NetworkManager.service
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/sbin/ecosmart-wifi-fallback

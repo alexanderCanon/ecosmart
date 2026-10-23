@@ -1,139 +1,97 @@
 ---
-- name: Provision EcoSmart offline Wi-Fi onboarding
+- name: Provision EcoSmart Wi-Fi Onboarding Portal
   hosts: raspberry
   become: true
-  vars_prompt:
-    - name: ecosmart_ap_password
-      prompt: "Set a WPA2 password for EcoSmart-Setup (8-63 characters)"
-      private: true
-      confirm: true
 
   tasks:
-    - name: Validate setup password
-      ansible.builtin.assert:
-        that:
-          - ecosmart_ap_password | length >= 8
-          - ecosmart_ap_password | length <= 63
-        fail_msg: "The access point password must contain 8-63 characters."
-      no_log: true
+    - name: Disable conflicting RaspAP and standalone hotspot services
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - hostapd.service
+        - lighttpd.service
+        - raspapd.service
+        - raspap-network-activity@wlan0.service
+        - dnsmasq.service
+      failed_when: false
 
-    - name: Install hotspot dependencies
+    - name: Disable deprecated prototype units
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        state: stopped
+        enabled: false
+      loop:
+        - ecosmart-wifi-fallback.timer
+        - ecosmart-wifi-fallback.service
+        - ecosmart-wifi-portal.service
+      failed_when: false
+
+    - name: Remove deprecated prototype files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/ecosmart-wifi-fallback.timer
+        - /etc/systemd/system/ecosmart-wifi-fallback.service
+        - /etc/systemd/system/ecosmart-wifi-portal.service
+        - /usr/local/sbin/ecosmart-wifi-fallback
+        - /usr/local/sbin/ecosmart-wifi-portal
+        - /usr/local/sbin/ecosmart-wifi-connect
+
+    - name: Install required packages
       ansible.builtin.apt:
         name:
           - network-manager
           - dnsmasq-base
           - python3
+          - curl
         state: present
         update_cache: true
         cache_valid_time: 3600
 
-    - name: Check whether the setup AP profile exists
-      ansible.builtin.command:
-        argv: [nmcli, -g, connection.id, connection, show, EcoSmart-Setup]
-      register: ecosmart_ap_profile
-      changed_when: false
-      failed_when: false
-
-    - name: Create setup AP profile without activating it
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - connection
-          - add
-          - type
-          - wifi
-          - ifname
-          - wlan0
-          - con-name
-          - EcoSmart-Setup
-          - ssid
-          - EcoSmart-Setup
-          - 802-11-wireless.mode
-          - ap
-          - 802-11-wireless.band
-          - bg
-          - ipv4.method
-          - shared
-          - ipv4.addresses
-          - 10.42.0.1/24
-          - ipv6.method
-          - disabled
-          - connection.autoconnect
-          - "no"
-      when: ecosmart_ap_profile.rc != 0
-
-    - name: Configure private WPA2 credentials
-      ansible.builtin.command:
-        argv:
-          - nmcli
-          - connection
-          - modify
-          - EcoSmart-Setup
-          - wifi-sec.key-mgmt
-          - wpa-psk
-          - wifi-sec.psk
-          - "{{ ecosmart_ap_password }}"
-          - connection.autoconnect
-          - "no"
-          - ipv4.method
-          - shared
-          - ipv4.addresses
-          - 10.42.0.1/24
-      no_log: true
-      changed_when: false
-
-    - name: Install Wi-Fi fallback controller
-      ansible.builtin.copy:
-        src: wifi-setup/fallback.sh
-        dest: /usr/local/sbin/ecosmart-wifi-fallback
+    - name: Ensure NetworkManager dnsmasq-shared directory exists
+      ansible.builtin.file:
+        path: /etc/NetworkManager/dnsmasq-shared.d
+        state: directory
         owner: root
         group: root
-        mode: "0750"
+        mode: "0755"
 
-    - name: Install Wi-Fi connection helper
+    - name: Install captive DNS redirection configuration
       ansible.builtin.copy:
-        src: wifi-setup/connect.py
-        dest: /usr/local/sbin/ecosmart-wifi-connect
-        owner: root
-        group: root
-        mode: "0700"
-
-    - name: Install setup portal
-      ansible.builtin.copy:
-        src: wifi-setup/portal.py
-        dest: /usr/local/sbin/ecosmart-wifi-portal
-        owner: root
-        group: root
-        mode: "0700"
-
-    - name: Install systemd units
-      ansible.builtin.copy:
-        src: "wifi-setup/{{ item }}"
-        dest: "/etc/systemd/system/{{ item }}"
+        src: wifi-setup/ecosmart-captive.conf
+        dest: /etc/NetworkManager/dnsmasq-shared.d/ecosmart-captive.conf
         owner: root
         group: root
         mode: "0644"
-      loop:
-        - ecosmart-wifi-fallback.service
-        - ecosmart-wifi-fallback.timer
-        - ecosmart-wifi-portal.service
-      register: wifi_unit_files
 
-    - name: Reload systemd units
+    - name: Install EcoSmart Wi-Fi onboarding script
+      ansible.builtin.copy:
+        src: wifi-setup/ecosmart-wifi-setup.py
+        dest: /usr/local/sbin/ecosmart-wifi-setup
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Install systemd service unit
+      ansible.builtin.copy:
+        src: wifi-setup/ecosmart-wifi-setup.service
+        dest: /etc/systemd/system/ecosmart-wifi-setup.service
+        owner: root
+        group: root
+        mode: "0644"
+      register: wifi_service_unit
+
+    - name: Reload systemd daemon
       ansible.builtin.systemd_service:
         daemon_reload: true
-      when: wifi_unit_files.changed
+      when: wifi_service_unit.changed
 
-    - name: Enable and start Wi-Fi fallback timer
+    - name: Enable and restart EcoSmart Wi-Fi setup service
       ansible.builtin.systemd_service:
-        name: ecosmart-wifi-fallback.timer
+        name: ecosmart-wifi-setup.service
         enabled: true
-        state: started
-      when: not ansible_check_mode
-
-    - name: Enable and start local Wi-Fi portal service
-      ansible.builtin.systemd_service:
-        name: ecosmart-wifi-portal.service
-        enabled: true
-        state: started
+        state: restarted
       when: not ansible_check_mode

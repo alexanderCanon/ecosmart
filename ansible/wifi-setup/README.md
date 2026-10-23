@@ -1,31 +1,49 @@
-# EcoSmart offline Wi-Fi onboarding (Raspberry Pi 4)
+# EcoSmart Wi-Fi Onboarding Portal (Raspberry Pi)
 
-## Behavior
+Sistema autónomo de aprovisionamiento de Wi-Fi para Raspberry Pi (NetworkManager + Python).
 
-- NetworkManager keeps the Wi-Fi profiles you have already saved and automatically reconnects to them on boot.
-- If wlan0 has no active connection approximately 95 seconds after boot, a systemd timer starts `EcoSmart-Setup` (WPA2) on `10.42.0.1/24`.
-- Connect your phone to `EcoSmart-Setup` and visit **http://10.42.0.1:8080**.
-- Select a cached nearby SSID (when available) or enter an SSID manually, and supply its WPA2 password.
-- The portal briefly disconnects the AP to join the requested network. On failure it attempts to restore the AP.
-- The portal listens **only** on `10.42.0.1`, not on Ethernet or Tailscale. Ethernet profiles are never modified.
+## Comportamiento
 
-## Deployment (from laptop with Tailscale)
+1. **Al encender la Raspberry Pi (Boot):**
+   - Espera unos segundos para que NetworkManager intente conectarse automáticamente a las redes Wi-Fi previamente guardadas.
+   - Verifica si `wlan0` tiene conexión activa con salida a internet.
+   - **Si ya tiene internet vía Wi-Fi:** El servicio finaliza silenciosamente (código 0). No abre ningún punto de acceso y la Pi opera normalmente.
+
+2. **Si NO detecta conexión a internet en `wlan0`:**
+   - Levanta automáticamente una red Wi-Fi temporal abierta: **`EcoSmart-Setup`** en `10.42.0.1`.
+   - Inicia un portal web cautivo en el puerto `80`.
+   - Cuando conectas tu teléfono o laptop a `EcoSmart-Setup`, el dispositivo detecta el portal cautivo y abre automáticamente la pantalla de configuración (o puedes navegar a `http://10.42.0.1`).
+   - Muestra las redes Wi-Fi detectadas a su alrededor con su nivel de señal y solicita la contraseña.
+
+3. **Al pulsar "Conectar a internet":**
+   - La Pi intenta conectarse a la red seleccionada usando `nmcli`.
+   - Si la conexión tiene éxito y confirma salida a internet:
+     - **Apaga inmediatamente el punto de acceso `EcoSmart-Setup`**.
+     - **Cierra el servidor web del portal**.
+     - La configuración queda guardada en NetworkManager para conectarse sola en futuros reinicios.
+   - Si la contraseña fue incorrecta o falló la conexión:
+     - Restaura `EcoSmart-Setup` para que puedas volver a intentar.
+
+## Despliegue con Ansible
+
+Desde tu equipo local (con la Raspberry Pi conectada por Ethernet / Tailscale):
 
 ```bash
-ansible-playbook -i ansible/inventory.ini ansible/wifi-setup.yml \
-  --private-key ~/.ssh/id_ed25519 \
-  --ssh-extra-args='-o IdentitiesOnly=yes' \
-  --ask-become-pass
+ansible-playbook -i ansible/inventory.ini ansible/wifi-setup.yml -K
 ```
 
-Ansible prompts for a unique WPA2 password (8-63 chars). **Never commit the password to Git.** During the first test, keep Ethernet plugged in for recovery.
+*(El parámetro `-K` te solicitará la contraseña de sudo del usuario `sef` en la Raspberry Pi).*
 
-## Constraints and warnings
+## Verificación y Monitoreo
 
-- One Wi-Fi radio cannot reliably serve as both a station and an AP concurrently. Switching to another network temporarily drops the setup AP.
-- Cached SSIDs can be stale; manually entering the SSID always remains available. This first version supports WPA2-Personal networks; captive portals, open networks, and WPA-Enterprise require additional work.
-- The password is transferred over HTTP **within the WPA2-protected AP**. Only share the AP password with trusted people. This is a provisioning interface, not a public service.
-- Automatic recovery is best-effort and should be tested with a deliberately incorrect Wi-Fi password **while Ethernet remains connected** before relying on headless operation.
-- NetworkManager shared IPv4 mode requires DHCP support (`dnsmasq-base`). Some networks and radio/firmware combinations may need further adjustments.
-- If the hotspot is not visible after reboot, recover using Ethernet + SSH/Tailscale; inspect `journalctl -u ecosmart-wifi-fallback.service -u ecosmart-wifi-portal.service`.
-- To disable automatic fallback without removing saved connections: `sudo systemctl disable --now ecosmart-wifi-fallback.timer`. To disable the portal: `sudo systemctl disable --now ecosmart-wifi-portal.service`.
+Para revisar los logs en tiempo real del servicio en la Raspberry Pi:
+
+```bash
+sudo journalctl -u ecosmart-wifi-setup.service -f
+```
+
+Para forzar la apertura del portal manualmente si deseas probarlo:
+
+```bash
+sudo systemctl restart ecosmart-wifi-setup.service
+```
